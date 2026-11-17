@@ -1,22 +1,14 @@
 import os
-import subprocess
-import sys
-
-# Pillow kütüphanesi yoksa anında otomatik kur
-try:
-    from PIL import Image, ImageDraw, ImageFont
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow"])
-    from PIL import Image, ImageDraw, ImageFont
-
 import logging
 import requests
 import io
 import json
 from flask import Flask, request, jsonify
+from PIL import Image, ImageDraw, ImageFont
 from google import genai
 from google.genai import types
 
+# Log ayarları
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 app = Flask(__name__)
@@ -28,6 +20,7 @@ TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 client = genai.Client()
 
+# Font dosyası yönetimi
 FONT_PATH = "DejaVuSans-Bold.ttf"
 if not os.path.exists(FONT_PATH):
     try:
@@ -41,45 +34,121 @@ if not os.path.exists(FONT_PATH):
 
 def create_flyer(data):
     img_width, img_height = 1000, 1250
-    image = Image.new("RGB", (img_width, img_height), color="#0b132b")
+    # Derin endüstriyel lacivert arka plan
+    image = Image.new("RGB", (img_width, img_height), color="#050c21")
     draw = ImageDraw.Draw(image)
 
+    # Fontları yükle
     try:
-        font_title = ImageFont.truetype(FONT_PATH, 38)
-        font_sub = ImageFont.truetype(FONT_PATH, 26)
-        font_text = ImageFont.truetype(FONT_PATH, 20)
-        font_small = ImageFont.truetype(FONT_PATH, 16)
+        font_header = ImageFont.truetype(FONT_PATH, 20)
+        font_title = ImageFont.truetype(FONT_PATH, 34)
+        font_sub = ImageFont.truetype(FONT_PATH, 22)
+        font_text = ImageFont.truetype(FONT_PATH, 17)
+        font_small = ImageFont.truetype(FONT_PATH, 14)
     except Exception:
-        font_title = font_sub = font_text = font_small = ImageFont.load_default()
+        font_header = font_title = font_sub = font_text = font_small = ImageFont.load_default()
 
-    # Üst Şerit (Şirket Adı)
-    draw.rectangle([50, 40, 950, 130], fill="#1c2541")
-    draw.text((70, 70), str(data.get("firma", "YENİ KARİYER FIRSATI")).upper(), fill="#ffb703", font=font_title)
-
-    # Pozisyon Kutusu (Sarı)
-    draw.rounded_rectangle([50, 160, 950, 280], radius=12, fill="#ffb703")
-    draw.text((70, 180), "ARANAN POZİSYON:", fill="#0b132b", font=font_small)
-    draw.text((70, 215), str(data.get("pozisyon", "Personel Alımı")).upper(), fill="#0b132b", font=font_sub)
-
-    # Şartlar / Aranan Nitelikler Kutusu (Beyaz)
-    draw.rounded_rectangle([50, 310, 950, 730], radius=12, fill="#ffffff")
-    draw.text((70, 340), "ARANAN NİTELİKLER:", fill="#1d3557", font=font_sub)
+    # --- 1. ÜST KURUMSAL BANNER (Daha Profesyonel) ---
+    draw.rectangle([40, 30, 960, 120], fill="#111736")
+    firma_adi = str(data.get("firma", "ÖZ GAYRİMTENKUL GIDA... LİMİTED ŞİRKETİ")).upper()
     
-    y_offset = 390
-    nitelikler = data.get("nitelikler", ["• Tecrübeli adaylar aranıyor", "• Vardiyalı çalışma imkanı"])
-    for nitelik in nitelikler[:5]:
-        draw.text((70, y_offset), f"• {nitelik}", fill="#1d3557", font=font_text)
-        y_offset += 55
+    # Metni kutuya sığdırmak için yardımcı fonksiyon
+    def draw_text_in_box(x, y, text, fill, font, max_width, lines=1, align="left"):
+        words = text.split()
+        wrapped_lines = []
+        current_line = []
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            if bbox[2] <= max_width:
+                current_line.append(word)
+            else:
+                wrapped_lines.append(' '.join(current_line))
+                current_line = [word]
+        wrapped_lines.append(' '.join(current_line))
+        
+        y_pos = y
+        for i in range(min(len(wrapped_lines), lines)):
+            line_text = wrapped_lines[i]
+            line_bbox = draw.textbbox((0, 0), line_text, font=font)
+            if align == "center": x_pos = x + (max_width - line_bbox[2]) / 2
+            else: x_pos = x
+            draw.text((x_pos, y_pos), line_text, fill=fill, font=font)
+            y_pos += line_bbox[3] - line_bbox[1] + 5
 
-    # Lokasyon ve Tarih Kutusu
-    draw.rounded_rectangle([50, 760, 950, 920], radius=12, fill="#1c2541")
-    draw.text((70, 790), f"LOKASYON: {data.get('lokasyon', 'Kocaeli / Çayırova')}", fill="#ffffff", font=font_text)
-    draw.text((70, 845), f"SON BAŞVURU: {data.get('tarih', 'Güncel')}", fill="#ffb703", font=font_text)
+    draw_text_in_box(65, 50, firma_adi, fill="#ffc107", font=font_header, max_width=850, lines=1, align="left")
 
-    # İletişim / Numara Butonu (Sarı)
-    draw.rounded_rectangle([100, 960, 900, 1100], radius=16, fill="#ffb703")
-    draw.text((130, 985), "İLETİŞİM / BAŞVURU", fill="#0b132b", font=font_small)
-    draw.text((130, 1025), str(data.get("iletisim", "İnsan Kaynakları")), fill="#0b132b", font=font_sub)
+    # --- 2. POZİSYON BANNER'I (Sarı Dikkat Alanı) ---
+    draw.rounded_rectangle([40, 140, 960, 270], radius=14, fill="#ffc107")
+    draw.text((70, 160), "ARANAN POZİSYON", fill="#050c21", font=font_small)
+    pozisyon = str(data.get("pozisyon", "Metal Mamuller İmalat İşçisi")).upper()
+    draw_text_in_box(70, 195, pozisyon, fill="#050c21", font=font_title, max_width=870, lines=2, align="left")
+
+    # --- 3. ŞARTLAR VE İMKANLAR (İki Sütunlü Temiz Yerleşim) ---
+    # Sol Kutu: İŞ TANIMI & ŞARTLAR
+    draw.rounded_rectangle([40, 300, 490, 630], radius=12, fill="#111736")
+    draw.text((65, 325), "📋 İŞ TANIMI & ŞARTLAR", fill="#ffc107", font=font_sub)
+    
+    y_offset = 385
+    gorevler = [
+        "• Endüstriyel tesislerde üretim sürecini yönetmek.",
+        "• Tolerans ve kalite kontrol raporlaması.",
+        "• Metal montaj ve birleştirme işlemleri.",
+        "• Vardiyalı çalışma düzenine uygunluk."
+    ]
+    for gorev in gorevler:
+        draw_text_in_box(65, y_offset, gorev, fill="#ffffff", font=font_text, max_width=410, lines=3)
+        y_offset += 50
+    
+    # Sağ Kutu: ARANAN NİTELİKLER
+    draw.rounded_rectangle([510, 300, 960, 630], radius=12, fill="#111736")
+    draw.text((535, 325), "💼 ARANAN NİTELİKLER", fill="#ffc107", font=font_sub)
+    
+    y_offset_n = 385
+    nitelikler = [
+        "✔ Meslek Yüksek Okulu veya Endüstri Meslek Lisesi mezunu.",
+        "✔ 3-5 yıl benzer sektör tecrübesi.",
+        "✔ Teknik resim okuma ve ölçü aleti kullanımı.",
+        "✔ 30-45 yaş aralığında."
+    ]
+    for nitelik in nitelikikler:
+        draw_text_in_box(535, y_offset_n, nitelik, fill="#ffffff", font=font_text, max_width=410, lines=3)
+        y_offset_n += 55
+
+    # --- 4. MAAŞ VURGUSU (Çarpıcı Sarı Kutu) ---
+    draw.rounded_rectangle([40, 660, 960, 790], radius=14, fill="#ffc107")
+    draw.text((70, 682), "MAAŞ & ÜCRET", fill="#050c21", font=font_small)
+    maas_metni = str(data.get("maas", "28075,5 TL (AGR Dahil Değil)"))
+    draw_text_in_box(70, 715, maas_metni.upper(), fill="#050c21", font=font_title, max_width=870, lines=1)
+
+    # --- 5. SERVİS GÜZERGAHI (Sol) & İLETİŞİM (Sağ) ---
+    # Güzergah
+    draw.rounded_rectangle([40, 820, 490, 1050], radius=12, fill="#111736")
+    draw.text((65, 845), "📍 SERVİS GÜZERGAHI", fill="#ffc107", font=font_sub)
+    guzergahlar = data.get("guzergah", ["Gebze", "Kandıra", "Körfez", "Derince", "İzmit", "Kartepe", "Dilovası", "Çayırova"])
+    if isinstance(guzergahlar, str): guzergahlar = guzergahlar.split(",")
+    y_offset_g = 900
+    for durak in guzergahlar[:7]:
+        draw.text((65, y_offset_g), f"• {durak.strip()}", fill="#ffffff", font=font_text)
+        y_offset_g += 45
+
+    # İletişim
+    draw.rounded_rectangle([510, 820, 960, 1050], radius=12, fill="#111736")
+    draw.text((535, 845), "📞 İLETİŞİM / BAŞVURU", fill="#ffc107", font=font_sub)
+    
+    iletisim_adi = str(data.get("iletisim_kisi", "Hakan CEBECİ"))
+    iletisim_unvan = str(data.get("iletisim_unvan", "İnsan Kaynakları Yöneticisi"))
+    iletisim_tel = str(data.get("iletisim_tel", "0 533 975 46 93"))
+    iletisim_email = str(data.get("iletisim_email", "ik@oztahsildar.com.tr"))
+
+    draw.text((535, 900), iletisim_adi, fill="#ffffff", font=font_sub)
+    draw.text((535, 935), iletisim_unvan, fill="#cccccc", font=font_text)
+    draw.text((535, 980), iletisim_tel, fill="#ffc107", font=font_sub)
+    draw.text((535, 1020), iletisim_email, fill="#ffffff", font=font_text)
+
+    # Alt Kurumsal Damga Bandı
+    draw.rectangle([40, 1080, 960, 1160], fill="#040712")
+    draw.text((70, 1102), "OZT OZTÜRK TAŞIMACILIK VE LOJİSTİK A.Ş. • GÜNCEL İŞ İLANI", fill="#6c7c8c", font=font_small)
 
     output = io.BytesIO()
     image.save(output, format="JPEG", quality=95)
@@ -102,7 +171,7 @@ def webhook():
         
         requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
             "chat_id": chat_id,
-            "text": "🎨 İlan analiz ediliyor ve sade kurumsal afiş hazırlanıyor..."
+            "text": "🎨 İlan analiz ediliyor, profesyonel kurumsal afiş hazırlanıyor..."
         })
         
         try:
@@ -115,19 +184,23 @@ def webhook():
                 img_bytes = requests.get(f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}").content
                 
                 flyer_data = {
-                    "firma": "YENİ KARİYER FIRSATI",
-                    "pozisyon": "Personel Alımı",
-                    "nitelikler": ["Tecrübeli / Yetiştirilmek Üzere", "Vardiyalı Çalışma Uygun", "Ekip Çalışmasına Yatkın"],
-                    "lokasyon": "Kocaeli / Çayırova",
-                    "tarih": "Güncel",
-                    "iletisim": "İnsan Kaynakları"
+                    "firma": "ÖZ GAYRİMTENKUL GIDA SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
+                    "pozisyon": "METAL MAMULLER İMALAT İŞÇİSİ",
+                    "maas": "28075,5 TL (AGR Dahil Değil)",
+                    "guzergah": "Gebze, Kandıra, Körfez, Derince, İzmit, Kartepe, Dilovası, Çayırova",
+                    "iletisim_kisi": "Hakan CEBECİ",
+                    "iletisim_unvan": "İnsan Kaynakları Yöneticisi",
+                    "iletisim_tel": "0 533 975 46 93",
+                    "iletisim_email": "ik@oztahsildar.com.tr"
                 }
                 
                 try:
                     analysis_prompt = (
                         "Bu iş ilanından şu bilgileri JSON formatında çıkar: "
-                        "firma (şirket adı), pozisyon (pozisyon adı), nitelikler (liste olarak 3-4 madde), "
-                        "lokasyon (şehir/ilçe), tarih (son başvuru tarihi), iletisim (telefon veya email/kişi). "
+                        "firma (şirket adı), pozisyon (pozisyon adı), "
+                        "maas (maaş bilgisi), guzergah (servis güzergahı listesi), "
+                        "iletisim_kisi (ilgili kişi adı), iletisim_unvan (kişinin unvanı), "
+                        "iletisim_tel (telefon numarası), iletisim_email (email adresi). "
                         "Sadece saf JSON döndür başka hiçbir şey yazma."
                     )
                     
@@ -151,13 +224,13 @@ def webhook():
                 
                 requests.post(
                     f"{TELEGRAM_API_URL}/sendPhoto",
-                    data={"chat_id": chat_id, "caption": "✨ Sade ve şık kurumsal afişiniz hazır!"},
+                    data={"chat_id": chat_id, "caption": "✨ İşte istediğiniz profesyonel kurumsal afişiniz!"},
                     files={"photo": ("afis.jpg", final_image_bytes, "image/jpeg")}
                 )
         except Exception as e:
             requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
                 "chat_id": chat_id,
-                "text": f"❌ İşlem sırasında bir hata oluştu."
+                "text": f"❌ İşlem tamamlanırken bir hata oluştu."
             })
 
     return jsonify({"status": "ok"})
