@@ -13,7 +13,7 @@ from google.genai import types
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 
-# Render platformunun botu ayakta tutması için mini Flask sunucusu (Port binding hatası vermemesi için)
+# Render platformunun botu ayakta tutması için mini Flask sunucusu
 app_flask = Flask('')
 
 @app_flask.route('/')
@@ -39,15 +39,27 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎨 İlan analiz ediliyor ve profesyonel afiş tasarlanıyor, lütfen bekleyin...")
 
     try:
-        # 1. Adım: Gemini ile ilandaki kritik bilgileri özetlet
+        # 1. Adım: Gemini ile ilandaki kritik bilgileri özetlet (Modelleri sırayla deneyen akıllı yapı)
         analysis_prompt = "Bu iş ilanı görselindeki firma adını, pozisyonu ve temel şartları kısa ve net maddeler halinde çıkar."
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[
-                types.Part.from_bytes(data=bytes(photo_bytes), mime_type="image/jpeg"),
-                analysis_prompt
-            ]
-        )
+        
+        response = None
+        for m_name in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"]:
+            try:
+                response = client.models.generate_content(
+                    model=m_name,
+                    contents=[
+                        types.Part.from_bytes(data=bytes(photo_bytes), mime_type="image/jpeg"),
+                        analysis_prompt
+                    ]
+                )
+                if response and response.text:
+                    break
+            except Exception:
+                continue
+                
+        if not response or not response.text:
+            raise Exception("Şu an aktif bir Gemini modeline ulaşılamadı.")
+            
         ilan_ozeti = response.text
 
         # 2. Adım: Pimtaş örneğindeki kurumsal konsepte uygun tasarım komutu
@@ -81,19 +93,4 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✨ **İlan Analiz Sonucu:**\n\n{ilan_ozeti}\n\n*(Görsel sunucusu yoğun, birkaç saniye sonra tekrar deneyebilirsiniz.)*")
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Bir hata oluştu: {str(e)}")
-
-def main():
-    # Arka planda Flask sunucusunu başlat (Render için zorunlu)
-    t = Thread(target=run_flask)
-    t.start()
-
-    # Telegram Botunu başlat
-    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    application.add_handler(MessageHandler(filters.PHOTO & (~filters.COMMAND), handle_job_image))
-    
-    print("🤖 Afiş botu bulutta aktif!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-
-if __name__ == "__main__":
-    main()
+        await update.message.reply_text
