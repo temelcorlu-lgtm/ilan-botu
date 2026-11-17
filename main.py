@@ -36,15 +36,16 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo_bytes = await photo_file.download_as_bytearray()
     
     await context.bot.send_chat_action(chat_id=chat_id, action="upload_photo")
-    await update.message.reply_text("🎨 İlan analiz ediliyor ve profesyonel afiş tasarlanıyor, lütfen bekleyin...")
+    await update.message.reply_text("🎨 İlan analiz ediliyor (Hata ayıklama aktif), lütfen bekleyin...")
+
+    error_logs = []
 
     try:
-        # Modelleri sırayla deneyen akıllı döngü (Hangisi müsaitse oradan yürür)
         analysis_prompt = "Bu iş ilanı görselindeki firma adını, pozisyonu ve temel şartları kısa ve net maddeler halinde çıkar."
         
         response = None
-        # En kararlı ve güncel modelleri sırayla test eder
-        for m_name in ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.8-flash"]:
+        # Denenecek modeller ve her birinin hata detayını toplama döngüsü
+        for m_name in ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash"]:
             try:
                 response = client.models.generate_content(
                     model=m_name,
@@ -55,11 +56,14 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 if response and response.text:
                     break
-            except Exception:
+            except Exception as e:
+                error_logs.append(f"Model ({m_name}) Hatası: {str(e)}")
                 continue
                 
         if not response or not response.text:
-            raise Exception("Şu an aktif hiçbir Gemini modeline ulaşılamadı.")
+            # Hiçbiri çalışmazsa toplanan tüm hata detaylarını Telegram'a fırlat
+            detayli_hata = "\n".join(error_logs)
+            raise Exception(f"Tüm modeller başarısız oldu:\n{detayli_hata}")
             
         ilan_ozeti = response.text
 
@@ -94,7 +98,8 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✨ **İlan Analiz Sonucu:**\n\n{ilan_ozeti}\n\n*(Görsel sunucusu yoğun, birkaç saniye sonra tekrar deneyebilirsiniz.)*")
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Bir hata oluştu: {str(e)}")
+        # Kodun herhangi bir yerinde hata olursa Telegram'a tam sebebini yazdıracak
+        await update.message.reply_text(f"🔍 **Hata Ayıklama Raporu:**\n\n{str(e)}")
 
 def main():
     # Arka planda Flask sunucusunu başlat
