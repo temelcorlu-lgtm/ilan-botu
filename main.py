@@ -112,35 +112,37 @@ def webhook():
                 file_path = file_res["result"]["file_path"]
                 img_bytes = requests.get(f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}").content
                 
-                analysis_prompt = (
-                    "Bu iş ilanından şu bilgileri JSON formatında çıkar: "
-                    "pozisyon (string), nitelikler (liste olarak 3-4 madde), lokasyon (string), tarih (string), iletisim (string). "
-                    "Sadece saf JSON döndür."
-                )
-                
-                # En güncel model adı olarak güncellendi
-                response = client.models.generate_content(
-                    model="gemini-3.8-flash",
-                    contents=[
-                        types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
-                        analysis_prompt
-                    ]
-                )
-                
                 flyer_data = {
-                    "pozisyon": "Personel Alımı",
-                    "nitelikler": ["Tecrübeli / Yetiştirilmek Üzere", "Esnek Çalışma Saatlerine Uygun", "Takım Çalışmasına Yatkın"],
+                    "pozisyon": "Genel Başvuru / Personel Alımı",
+                    "nitelikler": ["• Kurumsal çalışma ortamı", "• Vardiyalı imkanlar", "• Dinamik ekip uyumu"],
                     "lokasyon": "Kocaeli / Çayırova",
                     "tarih": "Güncel",
                     "iletisim": "İnsan Kaynakları"
                 }
                 
-                if response and response.text:
-                    try:
+                # Gemini yoğunluk verirse hata fırlatmak yerine varsayılan şablonu kullanan güvenli blok
+                try:
+                    analysis_prompt = (
+                        "Bu iş ilanından şu bilgileri JSON formatında çıkar: "
+                        "pozisyon (string), nitelikler (liste olarak 3-4 madde), lokasyon (string), tarih (string), iletisim (string). "
+                        "Sadece saf JSON döndür."
+                    )
+                    
+                    response = client.models.generate_content(
+                        model="gemini-3.8-flash",
+                        contents=[
+                            types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+                            analysis_prompt
+                        ]
+                    )
+                    
+                    if response and response.text:
                         clean_text = response.text.replace("```json", "").replace("```", "").strip()
-                        flyer_data = json.loads(clean_text)
-                    except Exception:
-                        pass
+                        parsed_data = json.loads(clean_text)
+                        if isinstance(parsed_data, dict):
+                            flyer_data.update(parsed_data)
+                except Exception:
+                    pass # Yoğunluk olsa bile süreç kesilmez, varsayılan kurumsal şablonla devam eder
                 
                 final_image_bytes = create_flyer(flyer_data)
                 
@@ -152,7 +154,7 @@ def webhook():
         except Exception as e:
             requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
                 "chat_id": chat_id,
-                "text": f"❌ Bir hata oluştu: {str(e)}"
+                "text": f"❌ İşlem tamamlanırken bir hata oluştu."
             })
 
     return jsonify({"status": "ok"})
