@@ -39,11 +39,12 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎨 İlan analiz ediliyor ve profesyonel afiş tasarlanıyor, lütfen bekleyin...")
 
     try:
-        # 1. Adım: Gemini ile ilandaki kritik bilgileri özetlet (Modelleri sırayla deneyen akıllı yapı)
+        # Modelleri sırayla deneyen akıllı döngü (Hangisi müsaitse oradan yürür)
         analysis_prompt = "Bu iş ilanı görselindeki firma adını, pozisyonu ve temel şartları kısa ve net maddeler halinde çıkar."
         
         response = None
-        for m_name in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"]:
+        # En kararlı ve güncel modelleri sırayla test eder
+        for m_name in ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.8-flash"]:
             try:
                 response = client.models.generate_content(
                     model=m_name,
@@ -58,11 +59,11 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
                 
         if not response or not response.text:
-            raise Exception("Şu an aktif bir Gemini modeline ulaşılamadı.")
+            raise Exception("Şu an aktif hiçbir Gemini modeline ulaşılamadı.")
             
         ilan_ozeti = response.text
 
-        # 2. Adım: Pimtaş örneğindeki kurumsal konsepte uygun tasarım komutu
+        # Kurumsal konsepte uygun tasarım komutu
         design_prompt = (
             f"Professional corporate Instagram recruitment job flyer poster based on: {ilan_ozeti}. "
             "Dark navy blue technical background, bold yellow and white structured text boxes, "
@@ -72,7 +73,7 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         encoded_prompt = urllib.parse.quote(design_prompt)
         image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1000&height=1250&nologo=true"
 
-        # 3. Adım: Görseli Python üzerinden güvenle indir (3 kez deneme döngüsü)
+        # Görseli Python üzerinden güvenle indir (3 kez deneme döngüsü)
         image_bytes = None
         for attempt in range(3):
             try:
@@ -83,7 +84,7 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 continue
 
-        # 4. Adım: Başarıyla indiyse Telegram'a fotoğraf olarak gönder
+        # Başarıyla indiyse Telegram'a fotoğraf olarak gönder
         if image_bytes:
             await update.message.reply_photo(
                 photo=image_bytes,
@@ -93,4 +94,19 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✨ **İlan Analiz Sonucu:**\n\n{ilan_ozeti}\n\n*(Görsel sunucusu yoğun, birkaç saniye sonra tekrar deneyebilirsiniz.)*")
 
     except Exception as e:
-        await update.message.reply_text
+        await update.message.reply_text(f"❌ Bir hata oluştu: {str(e)}")
+
+def main():
+    # Arka planda Flask sunucusunu başlat
+    t = Thread(target=run_flask)
+    t.start()
+
+    # Telegram Botu başlat
+    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    application.add_handler(MessageHandler(filters.PHOTO & (~filters.COMMAND), handle_job_image))
+    
+    print("🤖 Afiş botu bulutta aktif!")
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
