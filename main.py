@@ -92,43 +92,45 @@ def create_dynamic_flyer(data):
 
     # --- 3. İŞ TANIMI & NİTELİKLER (Esnek İki Sütun) ---
     draw.rounded_rectangle([40, 300, 490, 630], radius=12, fill="#1b1a55")
-    draw.text((65, 325), "📋 İŞ TANIMI & ŞARTLAR", fill="#ffc107", font=font_sub)
+    draw.text((65, 325), "IS TANIMI & SARTLAR", fill="#ffc107", font=font_sub)
     y_off = 385
-    gorevler = data.get("gorevler", ["• Endüstriyel üretim süreçlerinde görev almak.", "• Vardiyalı düzene uyum sağlamak."])
+    gorevler = data.get("gorevler", ["- Endustriyel uretim sureclerinde gorev almak.", "- Vardiyali duzene uyum saglamak."])
+    if isinstance(gorevler, str): gorevler = [gorevler]
     for g in gorevler[:4]:
         draw_text_box(65, y_off, str(g), fill="#ffffff", font=font_text, max_width=410, lines=3)
         y_off += 50
 
     draw.rounded_rectangle([510, 300, 960, 630], radius=12, fill="#1b1a55")
-    draw.text((535, 325), "💼 ARANAN NİTELİKLER", fill="#ffc107", font=font_sub)
+    draw.text((535, 325), "ARANAN NITELIKLER", fill="#ffc107", font=font_sub)
     y_off_n = 385
-    nitelikler = data.get("nitelikler", ["✔ İlgili bölümlerden mezun.", "✔ Ekip çalışmasına yatkın ve tecrübeli."])
+    nitelikler = data.get("nitelikler", ["+ Ilgili bolumlerden mezun.", "+ Ekip calismasina yatkin ve tecrubeli."])
+    if isinstance(nitelikler, str): nitelikler = [nitelikler]
     for n in nitelikler[:4]:
         draw_text_box(535, y_off_n, str(n), fill="#ffffff", font=font_text, max_width=410, lines=3)
         y_off_n += 55
 
     # --- 4. MAAŞ / ÜCRET VURGUSU ---
     draw.rounded_rectangle([40, 660, 960, 790], radius=14, fill="#ffc107")
-    draw.text((70, 682), "MAAŞ & YAN HAKLAR", fill="#070f2b", font=font_small)
-    maas_metni = data.get("maas", "Güncel ve Tatminkar Ücret")
+    draw.text((70, 682), "MAAS & UCRET", fill="#070f2b", font=font_small)
+    maas_metni = data.get("maas", "Guncel ve Tatminkar Ucret")
     draw_text_box(70, 715, maas_metni, fill="#070f2b", font=font_title, max_width=870, lines=1)
 
     # --- 5. SERVİS GÜZERGAHI & İLETİŞİM ---
     draw.rounded_rectangle([40, 820, 490, 1050], radius=12, fill="#1b1a55")
-    draw.text((65, 845), "📍 SERVİS GÜZERGAHI", fill="#ffc107", font=font_sub)
-    guzergahlar = data.get("guzergah", "Kocaeli ve Çevre İlçeler")
+    draw.text((65, 845), "SERVIS GUZERGAHI", fill="#ffc107", font=font_sub)
+    guzergahlar = data.get("guzergah", "Kocaeli ve Cevre Ilceler")
     if isinstance(guzergahlar, str):
         guzergahlar = guzergahlar.split(",")
     y_off_g = 900
     for durak in guzergahlar[:7]:
-        draw.text((65, y_off_g), f"• {str(durak).strip()}", fill="#ffffff", font=font_text)
+        draw.text((65, y_off_g), f"- {str(durak).strip()}", fill="#ffffff", font=font_text)
         y_off_g += 45
 
     draw.rounded_rectangle([510, 820, 960, 1050], radius=12, fill="#1b1a55")
-    draw.text((535, 845), "📞 İLETİŞİM / BAŞVURU", fill="#ffc107", font=font_sub)
+    draw.text((535, 845), "ILETISIM / BASVURU", fill="#ffc107", font=font_sub)
     
-    iletisim_adi = data.get("iletisim_kisi", "İnsan Kaynakları")
-    iletisim_tel = data.get("iletisim_tel", "İlan Detayında")
+    iletisim_adi = data.get("iletisim_kisi", "Insan Kaynaklari")
+    iletisim_tel = data.get("iletisim_tel", "Ilan Detayinda")
     iletisim_email = data.get("iletisim_email", "")
 
     draw_text_box(535, 900, str(iletisim_adi), fill="#ffffff", font=font_sub, max_width=410, lines=2)
@@ -138,7 +140,7 @@ def create_dynamic_flyer(data):
 
     # Alt Bilgi Bandı
     draw.rectangle([40, 1080, 960, 1160], fill="#040712")
-    draw.text((70, 1102), "PROFESYONEL İŞ İLANI OTOMASYON SİSTEMİ", fill="#6c7c8c", font=font_small)
+    draw.text((70, 1102), "PROFESYONEL IS ILANI OTOMASYON SISTEMI", fill="#6c7c8c", font=font_small)
 
     output = io.BytesIO()
     image.save(output, format="JPEG", quality=95)
@@ -147,7 +149,7 @@ def create_dynamic_flyer(data):
 
 @app.route('/')
 def home():
-    return "Bot aktif ve çalışıyor!"
+    return "Bot aktif ve calisiyor!"
 
 @app.route(f'/{TELEGRAM_BOT_TOKEN}', methods=['POST'])
 def webhook():
@@ -161,7 +163,7 @@ def webhook():
         
         requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
             "chat_id": chat_id,
-            "text": "🎨 İlanın yapısı inceleniyor ve profesyonel afiş hazırlanıyor..."
+            "text": "Ilan analiz ediliyor ve profesyonel afis hazirlaniyor..."
         })
         
         try:
@@ -174,28 +176,28 @@ def webhook():
                 img_bytes = requests.get(f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}").content
                 
                 flyer_data = {
-                    "firma": "YENİ İŞ FIRSATI",
+                    "firma": "YENI IS FIRSATI",
                     "pozisyon": "PERSONEL ALIMI",
-                    "maas": "Güncel Şartlar",
-                    "gorevler": ["Üretim ve operasyon süreçleri"],
-                    "nitelikler": ["İlgili pozisyona uygun nitelikler"],
-                    "guzergah": "Gebze, Çayırova",
-                    "iletisim_kisi": "İnsan Kaynakları",
-                    "iletisim_tel": "İletişim Bilgisi"
+                    "maas": "Guncel Sartlar",
+                    "gorevler": ["Uretim ve operasyon surecleri"],
+                    "nitelikler": ["Ilgili pozisyona uygun nitelikler"],
+                    "guzergah": "Gebze, Cayirova",
+                    "iletisim_kisi": "Insan Kaynaklari",
+                    "iletisim_tel": "Iletisim Bilgisi"
                 }
                 
                 try:
                     analysis_prompt = (
-                        "Bu iş ilanından şu bilgileri eksiksiz olarak JSON formatında çıkar: "
-                        "firma (şirket adı), pozisyon (pozisyon adı), "
-                        "maas (maaş veya yan hak bilgisi), gorevler (liste olarak iş tanımı veya şartlar), "
-                        "nitelikler (liste olarak aranan nitelikler), guzergah (servis güzergahı), "
-                        "iletisim_kisi (ilgili kişi veya departman), iletisim_tel (telefon numarası), iletisim_email (varsa email). "
-                        "Sadece saf JSON döndür başka hiçbir açıklama yazma."
+                        "Bu is ilanindan su bilgileri eksiksiz olarak JSON formatinda cikar: "
+                        "firma (sirket adi), pozisyon (pozisyon adi), "
+                        "maas (maas veya yan hak bilgisi), gorevler (liste olarak is tanimi veya sartlar), "
+                        "nitelikler (liste olarak aranan nitelikler), guzergah (servis guzergahi), "
+                        "iletisim_kisi (ilgili kisi veya departman), iletisim_tel (telefon numarasi), iletisim_email (varsa email). "
+                        "Sadece saf JSON dondur baska hicbir aciklama yazma."
                     )
                     
                     response = client.models.generate_content(
-                        model="gemini-2.5-flash",
+                        model="gemini-1.5-flash",
                         contents=[
                             types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
                             analysis_prompt
@@ -208,19 +210,19 @@ def webhook():
                         if isinstance(parsed_data, dict):
                             flyer_data.update(parsed_data)
                 except Exception as e:
-                    logging.error(f"AI Analiz Hatası: {e}")
+                    logging.error(f"AI Analiz Hatasi: {e}")
                 
                 final_image_bytes = create_dynamic_flyer(flyer_data)
                 
                 requests.post(
                     f"{TELEGRAM_API_URL}/sendPhoto",
-                    data={"chat_id": chat_id, "caption": "✨ İstediğiniz profesyonel kurumsal afişiniz hazır!"},
+                    data={"chat_id": chat_id, "caption": "Profesyonel kurumsal afisiniz hazir!"},
                     files={"photo": ("afis.jpg", final_image_bytes, "image/jpeg")}
                 )
         except Exception as e:
             requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
                 "chat_id": chat_id,
-                "text": f"❌ İşlem sırasında bir hata oluştu."
+                "text": f"Islem sirasinda bir hata olustu."
             })
 
     return jsonify({"status": "ok"})
