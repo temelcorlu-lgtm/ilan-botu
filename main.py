@@ -2,7 +2,6 @@ import os
 import subprocess
 import sys
 
-# Eksik paketleri otomatik yükleme garantisi
 try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
@@ -17,7 +16,6 @@ from flask import Flask, request, jsonify
 from google import genai
 from google.genai import types
 
-# Log ayarları
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 app = Flask(__name__)
@@ -29,7 +27,6 @@ TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 client = genai.Client()
 
-# Font dosyası
 FONT_PATH = "DejaVuSans-Bold.ttf"
 if not os.path.exists(FONT_PATH):
     try:
@@ -121,8 +118,9 @@ def webhook():
                     "Sadece saf JSON döndür."
                 )
                 
+                # Güncel ve kararlı model adı kullanıldı
                 response = client.models.generate_content(
-                    model="gemini-1.5-flash",
+                    model="gemini-2.0-flash",
                     contents=[
                         types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
                         analysis_prompt
