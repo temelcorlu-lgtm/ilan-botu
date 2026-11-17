@@ -1,86 +1,56 @@
 import os
 import logging
-import urllib.parse
 import requests
+import io
 from flask import Flask, request, jsonify
+from PIL import Image, ImageDraw, ImageFont
+from google import genai
+from google.genai import types
 
 # Log ayarları
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 app = Flask(__name__)
 
-# Telegram Bot Token ve Render URL Ayarı
 TELEGRAM_BOT_TOKEN = "8797369678:AAEiCv9POm8pJUHWKabZTU6O-XaraBL9GPg"
 PORT = int(os.environ.get("PORT", 8080))
 RENDER_URL = "https://ilan-botu.onrender.com"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
-@app.route('/')
-def home():
-    return "Bot aktif ve çalışıyor!"
+client = genai.Client()
 
-@app.route(f'/{TELEGRAM_BOT_TOKEN}', methods=['POST'])
-def webhook():
-    update = request.get_json()
-    if not update:
-        return jsonify({"status": "no data"}), 400
-
-    # Gelen mesajı ve fotoğrafı kontrol et
-    message = update.get("message") or update.get("edited_message")
-    if message and "photo" in message:
-        chat_id = message["chat"]["id"]
-        
-        # Kullanıcıya hemen bilgi mesajı gönder
-        requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
-            "chat_id": chat_id,
-            "text": "🎨 Kurumsal ilan afişiniz tasarlanıyor, lütfen bekleyin..."
-        })
-        
-        try:
-            # En yüksek çözünürlüklü fotoğrafı al
-            photos = message["photo"]
-            file_id = photos[-1]["file_id"]
-            
-            # Telegram'dan dosya yolunu öğren
-            file_res = requests.get(f"{TELEGRAM_API_URL}/getFile?file_id={file_id}").json()
-            if file_res.get("ok"):
-                # Profesyonel kurumsal afiş tasarımı komutu
-                design_prompt = (
-                    "Professional corporate Instagram recruitment job flyer poster, "
-                    "dark navy blue background, bold yellow and white structured text boxes, "
-                    "clean modern typography, high quality graphic design."
-                )
-                encoded_prompt = urllib.parse.quote(design_prompt)
-                image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1000&height=1250&nologo=true"
-                
-                # Pollinations AI üzerinden görseli indir
-                img_res = requests.get(image_url, timeout=25)
-                if img_res.status_code == 200 and len(img_res.content) > 1000:
-                    # Telegram'a fotoğraf olarak gönder
-                    requests.post(
-                        f"{TELEGRAM_API_URL}/sendPhoto",
-                        data={"chat_id": chat_id, "caption": "✨ İstediğiniz kurumsal afiş tasarımı hazır!"},
-                        files={"photo": ("afis.jpg", img_res.content, "image/jpeg")}
-                    )
-                else:
-                    requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
-                        "chat_id": chat_id,
-                        "text": "✨ Afiş görseli oluşturulamadı, lütfen tekrar deneyin."
-                    })
-        except Exception as e:
-            requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
-                "chat_id": chat_id,
-                "text": f"❌ İşlem sırasında bir hata oluştu."
-            })
-
-    return jsonify({"status": "ok"})
-
-if __name__ == "__main__":
-    # Render ayağa kalkarken Telegram webhook'unu otomatik olarak tanımlar
-    webhook_url = f"{RENDER_URL}/{TELEGRAM_BOT_TOKEN}"
+# Türkçe karakterleri destekleyen temiz bir font indirelim (Yoksa varsayılan kullanılır)
+FONT_PATH = "DejaVuSans-Bold.ttf"
+if not os.path.exists(FONT_PATH):
     try:
-        requests.get(f"{TELEGRAM_API_URL}/setWebhook?url={webhook_url}")
+        font_url = "https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Bold.ttf"
+        r = requests.get(font_url)
+        if r.status_code == 200:
+            with open(FONT_PATH, "wb") as f:
+                f.write(r.content)
     except Exception:
         pass
-        
-    app.run(host="0.0.0.0", port=PORT)
+
+def create_flyer(data):
+    # 1000x1250 Instagram dikey afiş boyutu
+    img_width, img_height = 1000, 1250
+    image = Image.new("RGB", (img_width, img_height), color="#0b132b") # Koyu lacivert kurumsal arka plan
+    draw = ImageDraw.Draw(image)
+
+    # Font ayarları
+    try:
+        font_title = ImageFont.truetype(FONT_PATH, 42)
+        font_sub = ImageFont.truetype(FONT_PATH, 28)
+        font_text = ImageFont.truetype(FONT_PATH, 22)
+        font_small = ImageFont.truetype(FONT_PATH, 18)
+    except Exception:
+        font_title = font_sub = font_text = font_small = ImageFont.load_default()
+
+    # Üst Başlık Şeridi
+    draw.rectangle([50, 50, 950, 150], fill="#1c2541")
+    draw.text((80, 75), "YENİ KARİYER FIRSATI!", fill="#ffb703", font=font_title)
+
+    # Pozisyon Kutusu (Sarı)
+    draw.rounded_rectangle([50, 180, 950, 320], radius=15, fill="#ffb703")
+    draw.text((80, 200), "POZİSYON:", fill="#0b132b", font=font_small)
+    draw.text((80, 2
