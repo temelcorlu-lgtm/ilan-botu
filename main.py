@@ -53,9 +53,21 @@ def create_flyer(data):
 
     # Üst Şerit (Şirket Adı)
     draw.rectangle([50, 40, 950, 130], fill="#1c2541")
-    draw.text((70, 70), data.get("firma", "YENİ KARİYER FIRSATI").upper(), fill="#ffb703", font=font_title)
+    draw.text((70, 70), str(data.get("firma", "YENİ KARİYER FIRSATI")).upper(), fill="#ffb703", font=font_title)
 
     # Pozisyon Kutusu (Sarı)
     draw.rounded_rectangle([50, 160, 950, 280], radius=12, fill="#ffb703")
     draw.text((70, 180), "ARANAN POZİSYON:", fill="#0b132b", font=font_small)
-    draw.text((70, 215
+    draw.text((70, 215), str(data.get("pozisyon", "Personel Alımı")).upper(), fill="#0b132b", font=font_sub)
+
+    # Şartlar / Aranan Nitelikler Kutusu (Beyaz)
+    draw.rounded_rectangle([50, 310, 950, 730], radius=12, fill="#ffffff")
+    draw.text((70, 340), "ARANAN NİTELİKLER:", fill="#1d3557", font=font_sub)
+    
+    y_offset = 390
+    nitelikler = data.get("nitelikler", ["• Tecrübeli adaylar aranıyor", "• Vardiyalı çalışma imkanı"])
+    for nitelik in nitelikler[:5]:
+        draw.text((70, y_offset), f"• {nitelik}", fill="#1d3557", font=font_text)
+        y_offset += 55
+
+    #
