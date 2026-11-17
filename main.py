@@ -21,7 +21,7 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎨 Kurumsal ilan afişiniz tasarlanıyor, lütfen bekleyin...")
 
     try:
-        # Gemini yoğunluğuna takılmadan doğrudan profesyonel kurumsal afiş komutu
+        # Doğrudan profesyonel kurumsal afiş komutu
         design_prompt = (
             "Professional corporate Instagram recruitment job flyer poster, "
             "dark navy blue background, bold yellow and white structured text boxes, "
