@@ -1,14 +1,22 @@
 import os
+import subprocess
+import sys
+
+# Pillow kütüphanesi yoksa anında otomatik kur
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow"])
+    from PIL import Image, ImageDraw, ImageFont
+
 import logging
 import requests
 import io
 import json
 from flask import Flask, request, jsonify
-from PIL import Image, ImageDraw, ImageFont
 from google import genai
 from google.genai import types
 
-# Log ayarları
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 app = Flask(__name__)
@@ -20,7 +28,6 @@ TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 client = genai.Client()
 
-# Font dosyası yönetimi
 FONT_PATH = "DejaVuSans-Bold.ttf"
 if not os.path.exists(FONT_PATH):
     try:
