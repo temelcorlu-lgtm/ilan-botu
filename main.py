@@ -1,10 +1,19 @@
 import os
+import subprocess
+import sys
+
+# Eksik paketleri otomatik yükleme garantisi
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow"])
+    from PIL import Image, ImageDraw, ImageFont
+
 import logging
 import requests
 import io
 import json
 from flask import Flask, request, jsonify
-from PIL import Image, ImageDraw, ImageFont
 from google import genai
 from google.genai import types
 
@@ -86,7 +95,7 @@ def home():
 def webhook():
     update = request.get_json()
     if not update:
-        return jsonify({"status": "no data"}), 400  # Düzeltildi
+        return jsonify({"status": "no data"}), 400
 
     message = update.get("message") or update.get("edited_message")
     if message and "photo" in message:
