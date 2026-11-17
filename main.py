@@ -118,9 +118,9 @@ def webhook():
                     "Sadece saf JSON döndür."
                 )
                 
-                # Güncel ve kararlı model adı kullanıldı
+                # En güncel model adı olarak güncellendi
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-3.8-flash",
                     contents=[
                         types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
                         analysis_prompt
