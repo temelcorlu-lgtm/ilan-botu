@@ -2,8 +2,6 @@ import os
 import logging
 import urllib.parse
 import requests
-from flask import Flask
-from threading import Thread
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from google import genai
@@ -13,19 +11,11 @@ from google.genai import types
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 
-# Render platformunun botu ayakta tutması için mini Flask sunucusu
-app_flask = Flask('')
-
-@app_flask.route('/')
-def home():
-    return "Bot aktif ve çalışıyor!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app_flask.run(host='0.0.0.0', port=port)
-
-# Telegram Bot Token ve Gemini Client Ayarı
+# Telegram Bot Token ve Render URL Ayarı
 TELEGRAM_BOT_TOKEN = "8797369678:AAEiCv9POm8pJUHWKabZTU6O-XaraBL9GPg"
+PORT = int(os.environ.get("PORT", 8080))
+RENDER_URL = "https://ilan-botu.onrender.com"  # Render servis adresin
+
 client = genai.Client()
 
 async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,7 +32,6 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         analysis_prompt = "Bu iş ilanı görselindeki firma adını, pozisyonu ve temel şartları kısa ve net maddeler halinde çıkar."
         
         response = None
-        # En kararlı ve yoğunluk yaşamayan modelleri sırayla dener
         for m_name in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-3.8-flash"]:
             try:
                 response = client.models.generate_content(
@@ -58,7 +47,7 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
                 
         if not response or not response.text:
-            raise Exception("Tüm Gemini modelleri şu an yoğun, lütfen 1 dakika sonra tekrar deneyin.")
+            raise Exception("Tüm Gemini modelleri şu an yoğun, lütfen tekrar deneyin.")
             
         ilan_ozeti = response.text
 
@@ -90,22 +79,24 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption="✨ İstediğiniz kurumsal afiş tasarımı hazır!"
             )
         else:
-            await update.message.reply_text(f"✨ **İlan Analiz Sonucu:**\n\n{ilan_ozeti}\n\n*(Görsel sunucusu yoğun, birkaç saniye sonra tekrar deneyebilirsiniz.)*")
+            await update.message.reply_text(f"✨ **İlan Analiz Sonucu:**\n\n{ilan_ozeti}")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Bir hata oluştu: {str(e)}")
 
 def main():
-    # Arka planda Flask sunucusunu başlat
-    t = Thread(target=run_flask)
-    t.start()
-
-    # Telegram Botu başlat
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(MessageHandler(filters.PHOTO & (~filters.COMMAND), handle_job_image))
     
-    print("🤖 Afiş botu bulutta aktif!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    print("🤖 Afiş botu webhook modunda başlatılıyor...")
+    
+    # Render üzerinde çakışma (Conflict) yaratmayan Webhook sistemi
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=TELEGRAM_BOT_TOKEN,
+        webhook_url=f"{RENDER_URL}/{TELEGRAM_BOT_TOKEN}"
+    )
 
 if __name__ == "__main__":
     main()
