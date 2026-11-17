@@ -86,7 +86,7 @@ def home():
 def webhook():
     update = request.get_json()
     if not update:
-        return jsonify({"status": "no data"}}, 400
+        return jsonify({"status": "no data"}), 400  # Düzeltildi
 
     message = update.get("message") or update.get("edited_message")
     if message and "photo" in message:
@@ -153,4 +153,8 @@ def webhook():
 if __name__ == "__main__":
     webhook_url = f"{RENDER_URL}/{TELEGRAM_BOT_TOKEN}"
     try:
-        requests.get(f"{TELE
+        requests.get(f"{TELEGRAM_API_URL}/setWebhook?url={webhook_url}")
+    except Exception:
+        pass
+        
+    app.run(host="0.0.0.0", port=PORT)
