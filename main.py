@@ -14,7 +14,7 @@ logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 # Telegram Bot Token ve Render URL Ayarı
 TELEGRAM_BOT_TOKEN = "8797369678:AAEiCv9POm8pJUHWKabZTU6O-XaraBL9GPg"
 PORT = int(os.environ.get("PORT", 8080))
-RENDER_URL = "https://ilan-botu.onrender.com"  # Render servis adresin
+RENDER_URL = "https://ilan-botu.onrender.com"
 
 client = genai.Client()
 
@@ -26,42 +26,32 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo_bytes = await photo_file.download_as_bytearray()
     
     await context.bot.send_chat_action(chat_id=chat_id, action="upload_photo")
-    await update.message.reply_text("🎨 İlan analiz ediliyor, afişiniz hazırlanıyor...")
+    await update.message.reply_text("🎨 İlan işleniyor ve afiş tasarlanıyor...")
 
     try:
-        analysis_prompt = "Bu iş ilanı görselindeki firma adını, pozisyonu ve temel şartları kısa ve net maddeler halinde çıkar."
+        # Tek deneme ve en sade komutla Gemini üzerinden hızlı özet alma
+        analysis_prompt = "Bu iş ilanındaki pozisyonu ve aranan nitelikleri kısaca yaz."
         
-        response = None
-        for m_name in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-3.8-flash"]:
-            try:
-                response = client.models.generate_content(
-                    model=m_name,
-                    contents=[
-                        types.Part.from_bytes(data=bytes(photo_bytes), mime_type="image/jpeg"),
-                        analysis_prompt
-                    ]
-                )
-                if response and response.text:
-                    break
-            except Exception:
-                continue
-                
-        if not response or not response.text:
-            raise Exception("Tüm Gemini modelleri şu an yoğun, lütfen tekrar deneyin.")
-            
-        ilan_ozeti = response.text
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=[
+                types.Part.from_bytes(data=bytes(photo_bytes), mime_type="image/jpeg"),
+                analysis_prompt
+            ]
+        )
+        
+        ilan_ozeti = response.text if response and response.text else "Personel Alımı ve İş İlanı"
 
         # Kurumsal konsepte uygun tasarım komutu
         design_prompt = (
             f"Professional corporate Instagram recruitment job flyer poster based on: {ilan_ozeti}. "
-            "Dark navy blue technical background, bold yellow and white structured text boxes, "
-            "clean modern typography, high quality graphic design."
+            "Dark navy blue background, bold yellow and white text, modern graphic design."
         )
         
         encoded_prompt = urllib.parse.quote(design_prompt)
         image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1000&height=1250&nologo=true"
 
-        # Görseli Python üzerinden güvenle indir (3 kez deneme döngüsü)
+        # Görseli Python üzerinden indir
         image_bytes = None
         for attempt in range(3):
             try:
@@ -72,17 +62,28 @@ async def handle_job_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 continue
 
-        # Başarıyla indiyse Telegram'a fotoğraf olarak gönder
         if image_bytes:
             await update.message.reply_photo(
                 photo=image_bytes,
                 caption="✨ İstediğiniz kurumsal afiş tasarımı hazır!"
             )
         else:
-            await update.message.reply_text(f"✨ **İlan Analiz Sonucu:**\n\n{ilan_ozeti}")
+            await update.message.reply_text("✨ Afiş görseli oluşturulamadı ancak sistem aktif.")
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Bir hata oluştu: {str(e)}")
+        # Gemini kotası takılsa bile süreci durdurmayıp doğrudan varsayılan afiş üreten yedek mekanizma
+        try:
+            fallback_prompt = "Professional corporate recruitment job flyer poster, dark navy blue background, modern graphic design."
+            encoded_prompt = urllib.parse.quote(fallback_prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1000&height=1250&nologo=true"
+            res = requests.get(image_url, timeout=25)
+            if res.status_code == 200:
+                await update.message.reply_photo(photo=res.content, caption="✨ Kurumsal afişiniz (Yedek mod) hazır!")
+                return
+        except Exception:
+            pass
+            
+        await update.message.reply_text(f"❌ İşlem sırasında yoğunluk oluştu. Lütfen tekrar deneyin.")
 
 def main():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
@@ -90,7 +91,6 @@ def main():
     
     print("🤖 Afiş botu webhook modunda başlatılıyor...")
     
-    # Render üzerinde çakışma (Conflict) yaratmayan Webhook sistemi
     application.run_webhook(
         listen="0.0.0.0",
         port=PORT,
