@@ -1,14 +1,22 @@
 import os
+import subprocess
+import sys
+
+# Pillow kütüphanesi yüklü değilse otomatik kur
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow"])
+    from PIL import Image, ImageDraw, ImageFont
+
 import logging
 import requests
 import io
 import json
 from flask import Flask, request, jsonify
-from PIL import Image, ImageDraw, ImageFont
 from google import genai
 from google.genai import types
 
-# Log ayarları
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 app = Flask(__name__)
@@ -20,7 +28,6 @@ TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 client = genai.Client()
 
-# Font dosyası yönetimi
 FONT_PATH = "DejaVuSans-Bold.ttf"
 if not os.path.exists(FONT_PATH):
     try:
@@ -34,11 +41,9 @@ if not os.path.exists(FONT_PATH):
 
 def create_flyer(data):
     img_width, img_height = 1000, 1250
-    # Derin endüstriyel lacivert arka plan
     image = Image.new("RGB", (img_width, img_height), color="#050c21")
     draw = ImageDraw.Draw(image)
 
-    # Fontları yükle
     try:
         font_header = ImageFont.truetype(FONT_PATH, 20)
         font_title = ImageFont.truetype(FONT_PATH, 34)
@@ -48,11 +53,6 @@ def create_flyer(data):
     except Exception:
         font_header = font_title = font_sub = font_text = font_small = ImageFont.load_default()
 
-    # --- 1. ÜST KURUMSAL BANNER (Daha Profesyonel) ---
-    draw.rectangle([40, 30, 960, 120], fill="#111736")
-    firma_adi = str(data.get("firma", "ÖZ GAYRİMTENKUL GIDA... LİMİTED ŞİRKETİ")).upper()
-    
-    # Metni kutuya sığdırmak için yardımcı fonksiyon
     def draw_text_in_box(x, y, text, fill, font, max_width, lines=1, align="left"):
         words = text.split()
         wrapped_lines = []
@@ -76,19 +76,20 @@ def create_flyer(data):
             draw.text((x_pos, y_pos), line_text, fill=fill, font=font)
             y_pos += line_bbox[3] - line_bbox[1] + 5
 
+    # Üst Banner
+    draw.rectangle([40, 30, 960, 120], fill="#111736")
+    firma_adi = str(data.get("firma", "ÖZ GAYRİMTENKUL GIDA... LİMİTED ŞİRKETİ")).upper()
     draw_text_in_box(65, 50, firma_adi, fill="#ffc107", font=font_header, max_width=850, lines=1, align="left")
 
-    # --- 2. POZİSYON BANNER'I (Sarı Dikkat Alanı) ---
+    # Pozisyon Banner
     draw.rounded_rectangle([40, 140, 960, 270], radius=14, fill="#ffc107")
     draw.text((70, 160), "ARANAN POZİSYON", fill="#050c21", font=font_small)
     pozisyon = str(data.get("pozisyon", "Metal Mamuller İmalat İşçisi")).upper()
     draw_text_in_box(70, 195, pozisyon, fill="#050c21", font=font_title, max_width=870, lines=2, align="left")
 
-    # --- 3. ŞARTLAR VE İMKANLAR (İki Sütunlü Temiz Yerleşim) ---
-    # Sol Kutu: İŞ TANIMI & ŞARTLAR
+    # Sol Sütun: İş Tanımı
     draw.rounded_rectangle([40, 300, 490, 630], radius=12, fill="#111736")
     draw.text((65, 325), "📋 İŞ TANIMI & ŞARTLAR", fill="#ffc107", font=font_sub)
-    
     y_offset = 385
     gorevler = [
         "• Endüstriyel tesislerde üretim sürecini yönetmek.",
@@ -100,10 +101,9 @@ def create_flyer(data):
         draw_text_in_box(65, y_offset, gorev, fill="#ffffff", font=font_text, max_width=410, lines=3)
         y_offset += 50
     
-    # Sağ Kutu: ARANAN NİTELİKLER
+    # Sağ Sütun: Nitelikler
     draw.rounded_rectangle([510, 300, 960, 630], radius=12, fill="#111736")
     draw.text((535, 325), "💼 ARANAN NİTELİKLER", fill="#ffc107", font=font_sub)
-    
     y_offset_n = 385
     nitelikler = [
         "✔ Meslek Yüksek Okulu veya Endüstri Meslek Lisesi mezunu.",
@@ -115,13 +115,12 @@ def create_flyer(data):
         draw_text_in_box(535, y_offset_n, nitelik, fill="#ffffff", font=font_text, max_width=410, lines=3)
         y_offset_n += 55
 
-    # --- 4. MAAŞ VURGUSU (Çarpıcı Sarı Kutu) ---
+    # Maaş Vurgusu
     draw.rounded_rectangle([40, 660, 960, 790], radius=14, fill="#ffc107")
     draw.text((70, 682), "MAAŞ & ÜCRET", fill="#050c21", font=font_small)
     maas_metni = str(data.get("maas", "28075,5 TL (AGR Dahil Değil)"))
     draw_text_in_box(70, 715, maas_metni.upper(), fill="#050c21", font=font_title, max_width=870, lines=1)
 
-    # --- 5. SERVİS GÜZERGAHI (Sol) & İLETİŞİM (Sağ) ---
     # Güzergah
     draw.rounded_rectangle([40, 820, 490, 1050], radius=12, fill="#111736")
     draw.text((65, 845), "📍 SERVİS GÜZERGAHI", fill="#ffc107", font=font_sub)
@@ -135,7 +134,6 @@ def create_flyer(data):
     # İletişim
     draw.rounded_rectangle([510, 820, 960, 1050], radius=12, fill="#111736")
     draw.text((535, 845), "📞 İLETİŞİM / BAŞVURU", fill="#ffc107", font=font_sub)
-    
     iletisim_adi = str(data.get("iletisim_kisi", "Hakan CEBECİ"))
     iletisim_unvan = str(data.get("iletisim_unvan", "İnsan Kaynakları Yöneticisi"))
     iletisim_tel = str(data.get("iletisim_tel", "0 533 975 46 93"))
@@ -146,7 +144,7 @@ def create_flyer(data):
     draw.text((535, 980), iletisim_tel, fill="#ffc107", font=font_sub)
     draw.text((535, 1020), iletisim_email, fill="#ffffff", font=font_text)
 
-    # Alt Kurumsal Damga Bandı
+    # Alt Band
     draw.rectangle([40, 1080, 960, 1160], fill="#040712")
     draw.text((70, 1102), "OZT OZTÜRK TAŞIMACILIK VE LOJİSTİK A.Ş. • GÜNCEL İŞ İLANI", fill="#6c7c8c", font=font_small)
 
@@ -212,34 +210,3 @@ def webhook():
                         ]
                     )
                     
-                    if response and response.text:
-                        clean_text = response.text.replace("```json", "").replace("```", "").strip()
-                        parsed_data = json.loads(clean_text)
-                        if isinstance(parsed_data, dict):
-                            flyer_data.update(parsed_data)
-                except Exception:
-                    pass
-                
-                final_image_bytes = create_flyer(flyer_data)
-                
-                requests.post(
-                    f"{TELEGRAM_API_URL}/sendPhoto",
-                    data={"chat_id": chat_id, "caption": "✨ İşte istediğiniz profesyonel kurumsal afişiniz!"},
-                    files={"photo": ("afis.jpg", final_image_bytes, "image/jpeg")}
-                )
-        except Exception as e:
-            requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
-                "chat_id": chat_id,
-                "text": f"❌ İşlem tamamlanırken bir hata oluştu."
-            })
-
-    return jsonify({"status": "ok"})
-
-if __name__ == "__main__":
-    webhook_url = f"{RENDER_URL}/{TELEGRAM_BOT_TOKEN}"
-    try:
-        requests.get(f"{TELEGRAM_API_URL}/setWebhook?url={webhook_url}")
-    except Exception:
-        pass
-        
-    app.run(host="0.0.0.0", port=PORT)
